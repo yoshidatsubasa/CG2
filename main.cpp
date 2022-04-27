@@ -7,12 +7,14 @@
 #include<d3dcompiler.h>
 #include<DirectXMath.h>
 using namespace DirectX;
+#define DIRECTINPUT_VERSION  0x0800   //DirectInputのバージョン指定
+#include<dinput.h>
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib,"d3dcompiler.lib")
-
-
+#pragma comment(lib,"dinput8.lib")
+#pragma comment(lib,"dxguid.lib")
 
 LRESULT WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 	switch (msg) {
@@ -25,8 +27,8 @@ LRESULT WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	OutputDebugStringA("Hello,DirectX!!\n");
-	const int window_height = 800;
-	const int window_width = 1200;
+	const int window_height = 720;
+	const int window_width = 1280;
 
 	
 
@@ -202,6 +204,25 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	result = device->CreateFence(fenceVal, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
 
+	//DirectInputの初期化
+	IDirectInput8* directInput = nullptr;
+	result = DirectInput8Create(w.hInstance, DIRECTINPUT_VERSION,IID_IDirectInput8,(void**) & directInput, nullptr);
+	assert(SUCCEEDED(result));
+
+	//キーボードデバイスの生成
+	IDirectInputDevice8* keyboard = nullptr;
+	result = directInput->CreateDevice(GUID_SysKeyboard, &keyboard, NULL);
+	assert(SUCCEEDED(result));
+
+	//入力データ形式のセット
+	result = keyboard->SetDataFormat(&c_dfDIKeyboard);//標準形式
+	assert(SUCCEEDED(result));
+
+	//排他制御レベルのセット
+	result = keyboard->SetCooperativeLevel(hwnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
+	assert(SUCCEEDED(result));
+
+
 	//描画初期化処理
 
 	// 頂点データ
@@ -319,9 +340,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// 頂点レイアウト
 	D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
 		{
-			"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
+		    "POSITION",
+			0,
+			DXGI_FORMAT_R32G32B32_FLOAT,
+			0,
 			D3D12_APPEND_ALIGNED_ELEMENT,
-			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
+			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+			0
 		}, // (1行で書いたほうが見やすい)
 	};
 
@@ -391,6 +416,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		}
 		//DirectX毎フレーム処理　ここから
 
+		//キーボード情報の所得開始
+		keyboard->Acquire();
+
+		//全キーの入力状態を取得する
+		BYTE key[256] = {};
+		keyboard->GetDeviceState(sizeof(key), key);
+
+		//数字の0キーが押されていたら
+		if (key[DIK_0])
+		{
+			OutputDebugStringA("Hit 0\n");  //出力ウィンドウに「Hit 0」と表示
+		}
+
+		
+
 		//バックバッファの番号を取得(2つなので0番か1番)
 		UINT bbIndex = swapChain->GetCurrentBackBufferIndex();
 
@@ -409,7 +449,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		//3. 画面クリア
 		FLOAT clearColor[] = { 0.1f,0.25f,0.5f,0.0f };//青っぽい色
+		if (key[DIK_SPACE])     // スペースキーが押されていたら
+		{
+			clearColor[0] = { 0 };
+			clearColor[1] = { 0.5f };
+			clearColor[2] = { 0.5f };
+			clearColor[3] = { 0.5f }; // 画面クリアカラーの数値を書き換える /
+		}
 		commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+
+		
 
 		//4. 描画コマンドここから
 		// ビューポート設定コマンド
@@ -483,171 +532,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	}
 
 	
-	//// 頂点バッファの設定
-	//D3D12_HEAP_PROPERTIES heapProp{};   // ヒープ設定
-	//heapProp.Type = D3D12_HEAP_TYPE_UPLOAD; // GPUへの転送用
-	//// リソース設定
-	//D3D12_RESOURCE_DESC resDesc{};
-	//resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	//resDesc.Width = sizeVB; // 頂点データ全体のサイズ
-	//resDesc.Height = 1;
-	//resDesc.DepthOrArraySize = 1;
-	//resDesc.MipLevels = 1;
-	//resDesc.SampleDesc.Count = 1;
-	//resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-	//// 頂点バッファの生成
-	//ID3D12Resource* vertBuff = nullptr;
-	//result = device->CreateCommittedResource(
-	//	&heapProp, // ヒープ設定
-	//	D3D12_HEAP_FLAG_NONE,
-	//	&resDesc, // リソース設定
-	//	D3D12_RESOURCE_STATE_GENERIC_READ,
-	//	nullptr,
-	//	IID_PPV_ARGS(&vertBuff));
-	//assert(SUCCEEDED(result));
-
-
-	//// GPU上のバッファに対応した仮想メモリ(メインメモリ上)を取得
-	//XMFLOAT3* vertMap = nullptr;
-	//result = vertBuff->Map(0, nullptr, (void**)&vertMap);
-	//assert(SUCCEEDED(result));
-	//// 全頂点に対して
-	//for (int i = 0; i < _countof(vertices); i++) {
-	//	vertMap[i] = vertices[i];   // 座標をコピー
-	//}
-	//// 繋がりを解除
-	//vertBuff->Unmap(0, nullptr);
-
-	//// 頂点バッファビューの作成
-	//D3D12_VERTEX_BUFFER_VIEW vbView{};
-	//// GPU仮想アドレス
-	//vbView.BufferLocation = vertBuff->GetGPUVirtualAddress();
-	//// 頂点バッファのサイズ
-	//vbView.SizeInBytes = sizeVB;
-	//// 頂点１つ分のデータサイズ
-	//vbView.StrideInBytes = sizeof(XMFLOAT3);
-
-	//ID3DBlob* vsBlob = nullptr;//頂点シェーダオブジェクト
-	//ID3DBlob* psBlob = nullptr;//ピクセルシェーダオブジェクト
-	//ID3DBlob* errorBlob = nullptr;//エラーオブジェクト
-
-	////頂点シェーダの読み込みとコンパイル
-	//result = D3DCompileFromFile(
-	//	L"BasicVS.hlsl",//シェーダファイル名
-	//	nullptr,
-	//	D3D_COMPILE_STANDARD_FILE_INCLUDE,//インクルード可能にする
-	//	"main", "vs_5_0",//エントリーポイント名、シェーダーモデル指定
-	//	D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,//デバッグ用設定
-	//	0,
-	//	&vsBlob, &errorBlob);
-	//
-	//// エラーなら
-	//if (FAILED(result)) {
-	//	// errorBlobからエラー内容をstring型にコピー
-	//	std::string error;
-	//	error.resize(errorBlob->GetBufferSize());
-
-	//	std::copy_n((char*)errorBlob->GetBufferPointer(),
-	//		errorBlob->GetBufferSize(),
-	//		error.begin());
-	//	error += "\n";
-	//	// エラー内容を出力ウィンドウに表示
-	//	OutputDebugStringA(error.c_str());
-	//	assert(0);
-	//}
-
-
-
-
-	//// ピクセルシェーダの読み込みとコンパイル
-	//result = D3DCompileFromFile(
-	//	L"BasicPS.hlsl",   // シェーダファイル名
-	//	nullptr,
-	//	D3D_COMPILE_STANDARD_FILE_INCLUDE, // インクルード可能にする
-	//	"main", "ps_5_0", // エントリーポイント名、シェーダーモデル指定
-	//	D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION, // デバッグ用設定
-	//	0,
-	//	&psBlob, &errorBlob);
-
-	//// エラーなら
-	//if (FAILED(result)) {
-	//	// errorBlobからエラー内容をstring型にコピー
-	//	std::string error;
-	//	error.resize(errorBlob->GetBufferSize());
-
-	//	std::copy_n((char*)errorBlob->GetBufferPointer(),
-	//		errorBlob->GetBufferSize(),
-	//		error.begin());
-	//	error += "\n";
-	//	// エラー内容を出力ウィンドウに表示
-	//	OutputDebugStringA(error.c_str());
-	//	assert(0);
-	//}
-
-
-	//// 頂点レイアウト
-	//D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
-	//	{
-	//		"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
-	//		D3D12_APPEND_ALIGNED_ELEMENT,
-	//		D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
-	//	}, // (1行で書いたほうが見やすい)
-	//};
-
-	//// グラフィックスパイプライン設定
-	//D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineDesc{};
-
-	//// シェーダーの設定
-	//pipelineDesc.VS.pShaderBytecode = vsBlob->GetBufferPointer();
-	//pipelineDesc.VS.BytecodeLength = vsBlob->GetBufferSize();
-	//pipelineDesc.PS.pShaderBytecode = psBlob->GetBufferPointer();
-	//pipelineDesc.PS.BytecodeLength = psBlob->GetBufferSize();
-
-	//// サンプルマスクの設定
-	//pipelineDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK; // 標準設定
-
- //   // ラスタライザの設定
-	//pipelineDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;  // カリングしない
-	//pipelineDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID; // ポリゴン内塗りつぶし
-	//pipelineDesc.RasterizerState.DepthClipEnable = true; // 深度クリッピングを有効に
-
-	//// ブレンドステート
-	//pipelineDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;  // RBGA全てのチャンネルを描画
- //   // 頂点レイアウトの設定
-	//pipelineDesc.InputLayout.pInputElementDescs = inputLayout;
-	//pipelineDesc.InputLayout.NumElements = _countof(inputLayout);
-
-	//// 図形の形状設定
-	//pipelineDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-
-	//// その他の設定
-	//pipelineDesc.NumRenderTargets = 1; // 描画対象は1つ
-	//pipelineDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; // 0～255指定のRGBA
-	//pipelineDesc.SampleDesc.Count = 1; // 1ピクセルにつき1回サンプリング
-
- //    // ルートシグネチャ
-	//ID3D12RootSignature* rootSignature;
-	//// ルートシグネチャの設定
-	//D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc{};
-	//rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-	//// ルートシグネチャのシリアライズ
-	//ID3DBlob* rootSigBlob = nullptr;
-	//result = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1_0,
-	//	&rootSigBlob, &errorBlob);
-	//assert(SUCCEEDED(result));
-	//result = device->CreateRootSignature(0, rootSigBlob->GetBufferPointer(), rootSigBlob->GetBufferSize(),
-	//	IID_PPV_ARGS(&rootSignature));
-	//assert(SUCCEEDED(result));
-	//rootSigBlob->Release();
-	//// パイプラインにルートシグネチャをセット
-	//pipelineDesc.pRootSignature = rootSignature;
-
-	//// パイプランステートの生成
-	//ID3D12PipelineState* pipelineState = nullptr;
-	//result = device->CreateGraphicsPipelineState(&pipelineDesc, IID_PPV_ARGS(&pipelineState));
-	//assert(SUCCEEDED(result));
-
 
 
 
