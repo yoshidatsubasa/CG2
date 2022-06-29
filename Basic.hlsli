@@ -11,6 +11,7 @@ struct VSOutput
 {
     // システム用頂点座標
     float4 svpos : SV_POSITION;
+    float3 normal: NORMAL; //法線ベクトル
     // uv値
     float2 uv  :TEXCOORD;
 };
