@@ -222,6 +222,52 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		//レンダーターゲットビューの生成
 		device->CreateRenderTargetView(backBuffers[i], &rtvDesc, rtvHandle);
 	}
+	// リソース設定
+	D3D12_RESOURCE_DESC depthResourceDesc{};
+	depthResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	depthResourceDesc.Width = window_width;  //レンダーターゲットに合わせる
+	depthResourceDesc.Height = window_height;//レンダーターゲットに合わせる
+	depthResourceDesc.DepthOrArraySize = 1;
+	depthResourceDesc.Format = DXGI_FORMAT_D32_FLOAT;  //深度値フォーマット
+	depthResourceDesc.SampleDesc.Count = 1;
+	depthResourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;  //デブスステンシル
+
+	//深度値用ヒーププロパティ
+	D3D12_HEAP_PROPERTIES depthHeapProp{};
+	depthHeapProp.Type = D3D12_HEAP_TYPE_DEFAULT;
+	//深度値のクリア設定
+	D3D12_CLEAR_VALUE depthClearValue{};
+	depthClearValue.DepthStencil.Depth = 1.0f; //深度値1.0f(最大値)でクリア
+	depthClearValue.Format = DXGI_FORMAT_D32_FLOAT; //深度値フォーマット
+
+	//リソース生成
+	ID3D12Resource* depthBuff = nullptr;
+	result = device->CreateCommittedResource(
+		&depthHeapProp,
+		D3D12_HEAP_FLAG_NONE,
+		&depthResourceDesc,
+		D3D12_RESOURCE_STATE_DEPTH_WRITE,  //深度値書き込みに使用
+		&depthClearValue,
+		IID_PPV_ARGS(&depthBuff)
+	);
+	//深度ビュー用デスクリプタヒープ作成
+	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
+	dsvHeapDesc.NumDescriptors = 1; //深度ビューは1つ
+	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;//デブスステンシルビュー
+	ID3D12DescriptorHeap* dsvHeap = nullptr;
+	result = device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&dsvHeap));
+	//深度ビュー作成
+	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+	dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;  //深度値フォーマット
+	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+	device->CreateDepthStencilView(
+		depthBuff,
+		&dsvDesc,
+		dsvHeap->GetCPUDescriptorHandleForHeapStart()
+	);
+
+	
+
 
 	//フェンスの生成
 	ID3D12Fence* fence = nullptr;
@@ -251,10 +297,36 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	Vertex vertices[] = {
 		//    x		 y	   z	  u    v
-		{{-50.0f,-50.0f,0.0f},{0.0f,1.0f}},	//左下
-		{{-50.0f,50.0f,0.0f}, {0.0f,0.0f}},	//左上
-		{{50.0f,-50.0f,0.0f}, {1.0f,1.0f}},	//右下
-		{{50.0f,50.0f,0.0f},  {1.0f,0.0f}},	//右上
+		//前
+		{{-5.0f,-5.0f,-5.0f},{0.0f,1.0f}},	 //左下
+		{{-5.0f,5.0f,-5.0f}, {0.0f,0.0f}},	 //左上
+		{{5.0f,-5.0f,-5.0f}, {1.0f,1.0f}},	 //右下
+		{{5.0f,5.0f,-5.0f},  {1.0f,0.0f}},	 //右上
+		//後
+		{{-5.0f,-5.0f,5.0f}, {0.0f,1.0f}},	 //左下
+		{{-5.0f,5.0f,5.0f},  {0.0f,0.0f}},	 //左上
+		{{5.0f,-5.0f,5.0f},  {1.0f,1.0f}},	 //右下
+		{{5.0f,5.0f,5.0f},   {1.0f,0.0f}},	 //右上
+		//左
+		{{5.0f,-5.0f,-5.0f},{0.0f,1.0f}},    //左下
+		{{5.0f,5.0f,-5.0f},  {0.0f,0.0f}},   //左上
+		{{5.0f,-5.0f,5.0f},{1.0f,1.0f}},     //右下
+		{{5.0f,5.0f,5.0f},  {1.0f,0.0f}},    //右上
+		//右
+		{{-5.0f,-5.0f,5.0f},{0.0f,1.0f}},    //左下
+		{{-5.0f,5.0f,5.0f},  {0.0f,0.0f}},   //左上
+		{{-5.0f,-5.0f,-5.0f},{1.0f,1.0f}},   //右下
+		{{-5.0f,5.0f,-5.0f},  {1.0f,0.0f}},  //右上
+		//下
+		{{-5.0f,5.0f,5.0f}, {0.0f,1.0f}},    //左下
+		{{5.0f, 5.0f,5.0f},   {0.0f,0.0f}},  //左上
+		{{-5.0f,5.0f,-5.0f}, {1.0f,1.0f}},   //右下
+		{{5.0f, 5.0f,-5.0f},  {1.0f,0.0f}},  //右上
+		//上
+		{{-5.0f,-5.0f,5.0f},  {0.0f,1.0f}},   //左下
+		{{5.0f,-5.0f,5.0f},  {0.0f,0.0f}},    //左上
+		{{-5.0f,-5.0f,-5.0f},   {1.0f,1.0f}}, //右下
+		{{5.0f,-5.0f,-5.0f},   {1.0f,0.0f}},  //右上
 	};
 
 	//// 頂点データ
@@ -298,7 +370,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		XMFLOAT4 color; // 色 (RGBA)
 	};
 
-	//定数バッファ用データ構造体（３Ｄ変換行列）
+	//定数バッファ用データ構造体（3D変換行列）
 	struct ConstBufferDataTransform {
 		XMMATRIX mat;//3D変換行列
 	};
@@ -306,8 +378,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ConstBufferDataTransform* constMapTransform = nullptr;
 	// インデックスデータ
 	unsigned short indices[] = {
+		//前
 		0, 1, 2, // 三角形1つ目
 		1, 2, 3, // 三角形2つ目
+		//後
+		4, 5, 6, // 三角形3つ目
+		5, 6, 7, // 三角形4つ目
+		//左
+		8, 9, 10, // 三角形5つ目
+		9, 10, 11, // 三角形6つ目
+		//右
+		12, 13, 14, // 三角形7つ目
+		13, 14, 15, // 三角形8つ目
+		//下
+		16, 17, 18, // 三角形9つ目
+		17, 18, 19, // 三角形10つ目
+		//上
+		20, 21, 22, // 三角形11つ目
+		21, 22, 23, // 三角形12つ目
 	};
 	//// インデックスデータ
 	//uint16_t indices[] =
@@ -742,6 +830,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	// グラフィックスパイプライン設定
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineDesc{};
+	//デブスステンシルステートの設定
+	pipelineDesc.DepthStencilState.DepthEnable = true;  //深度テストを行う
+	pipelineDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;  //書き込み許可
+	pipelineDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;  //小さければ合格
+	pipelineDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT; //深度値フォーマット
+
 	// シェーダーの設定
 	pipelineDesc.VS.pShaderBytecode = vsBlob->GetBufferPointer();
 	pipelineDesc.VS.BytecodeLength = vsBlob->GetBufferSize();
@@ -881,7 +975,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// レンダーターゲットビューのハンドルを取得
 		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = rtvHeap->GetCPUDescriptorHandleForHeapStart();
 		rtvHandle.ptr += bbIndex * device->GetDescriptorHandleIncrementSize(rtvHeapDesc.Type);
-		commandlist->OMSetRenderTargets(1, &rtvHandle, false, nullptr);
+		//commandlist->OMSetRenderTargets(1, &rtvHandle, false, nullptr);
+		//深度ステンシルビュー用デスクリプタヒープのハンドルを取得
+		D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvHeap->GetCPUDescriptorHandleForHeapStart();
+		commandlist->OMSetRenderTargets(1, &rtvHandle, false, &dsvHandle);
 
 		//if (key[DIK_D] || key[DIK_A])
 		//{
@@ -902,6 +999,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			else if (key[DIK_LEFT]) { position.x -= 1.0f; }
 		}
 
+		if (key[DIK_D] || key[DIK_A])
+		{
+			if (key[DIK_D]) { angle += XMConvertToRadians(1.0f); }
+			else if (key[DIK_A]) { angle -= XMConvertToRadians(1.0f); }
+
+			//angleラジアンだけY軸まわりに回転。半径は-100
+			eye.x = -100 * sinf(angle); eye.z = -100 * cosf(angle);
+			//ビュー変換行列を作り直す
+			matView = XMMatrixLookAtLH(XMLoadFloat3(&eye), XMLoadFloat3(&target), XMLoadFloat3(&up));
+		}
+
 		//ワールド変換行列
 		XMMATRIX matWorld;
 		//matWorldに単位行列を代入
@@ -909,14 +1017,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		//ワールド行列に単位行列を代入する処理
 		XMMATRIX matScale;//スケーリング行列
-		matScale = XMMatrixScaling(1.0f, 0.5f, 1.0f);
+		matScale = XMMatrixScaling(1.0f, 1.0f, 1.0f);
 		matWorld *= matScale;//ワールド行列にスケーリングを反映
 
 		XMMATRIX matRot;//回転行列
 		matRot = XMMatrixIdentity();
 		matRot *= XMMatrixRotationZ(XMConvertToRadians(0.0f));//Z軸まわりに0度回転してから
-		matRot *= XMMatrixRotationX(XMConvertToRadians(15.0f));//X軸まわりに15度回転してから
-		matRot *= XMMatrixRotationY(XMConvertToRadians(30.0f));//Y軸まわりに30度回転
+		matRot *= XMMatrixRotationX(XMConvertToRadians(35.0f));//X軸まわりに15度回転してから
+		matRot *= XMMatrixRotationY(XMConvertToRadians(35.0f));//Y軸まわりに30度回転
 		matWorld *= matRot;//ワールド行列に回転を反映
 
 		XMMATRIX matTrans;//平行移動行列
@@ -938,6 +1046,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		constMapMaterial->color = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 
 		commandlist->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+		commandlist->ClearDepthStencilView(dsvHandle,D3D12_CLEAR_FLAG_DEPTH, 1.0f,0,0, nullptr);
 
 		// 4.描画コマンドここから
 		// 
